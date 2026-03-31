@@ -1,4 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { login } from "./api/services";
 
 type FormField = {
   value: string;
@@ -6,21 +8,29 @@ type FormField = {
 };
 
 interface LoginForm {
-  email: FormField;
+  username: FormField;
   password: FormField;
 }
 
 function App() {
   const [form, setForm] = useState<LoginForm>({
-    email: { value: "" },
+    username: { value: "" },
     password: { value: "" },
+  });
+
+  const loginMutation = useMutation({
+    mutationKey: ["login"],
+    mutationFn: login,
+    onSuccess: (data) => {
+      localStorage.setItem(`access-token`, data.accessToken)
+      localStorage.setItem(`refresh-token`, data.refreshToken)
+    },
   });
 
   const handleValidation = (key: keyof LoginForm, value: string) => {
     switch (key) {
-      case "email":
-        if (!value) return "Email is required!";
-        if (value.indexOf("@") === -1) return "Email must be valid.";
+      case "username":
+        if (!value) return "Username is required!";
         break;
       case "password":
         if (!value) return "Password is required!";
@@ -46,21 +56,30 @@ function App() {
     event.preventDefault();
     if (Object.values(form).some((value) => value.error))
       alert("Form has invalid values");
-    else alert("Submitted");
+    else {
+      loginMutation.mutate(
+        JSON.stringify({ username: form.username.value, password: form.password.value }),
+      );
+    }
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      <p>
+        You can use any user's credentials from{" "}
+        <a target="_blank" href="https://dummyjson.com/users">dummyjson.com/users</a>. Tokens are returned in the
+        response and set as cookies.
+      </p>
       <div>
-        <label htmlFor="email">Email:</label>
+        <label htmlFor="username">Username:</label>
         <input
-          id="email"
-          type="email"
-          placeholder="email"
-          onChange={(e) => handleFormChange("email", e.target)}
+          id="username"
+          type="username"
+          placeholder="username"
+          onChange={(e) => handleFormChange("username", e.target)}
         />
-        {form.email?.error && (
-          <p style={{ color: "red" }}>{form.email.error}</p>
+        {form.username?.error && (
+          <p style={{ color: "red" }}>{form.username.error}</p>
         )}
       </div>
 
@@ -79,12 +98,15 @@ function App() {
       </div>
       <button
         type="submit"
-        disabled={Object.values(form).some(
-          (field: FormField) => !field.value || field.error,
-        )}
+        disabled={
+          Object.values(form).some(
+            (field: FormField) => !field.value || field.error,
+          ) || loginMutation.isPending
+        }
       >
         Login
       </button>
+      {loginMutation.isError && <p>{loginMutation.error.message}</p>}
     </form>
   );
 }
